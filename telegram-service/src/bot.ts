@@ -11,7 +11,6 @@ const app = express();
 app.use(express.json());
 
 app.get("/", (req: Request, res: Response) => {
-    // ... handle the root get request
     res.send("Welcome to the bot server!");
 });
 
