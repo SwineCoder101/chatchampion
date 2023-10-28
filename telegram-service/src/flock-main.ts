@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import dotenv from 'dotenv';
 import { WeiPerEther, ethers, formatEther } from "ethers";
-import { PrimeSdk } from '@etherspot/prime-sdk';
 import ChatUpdate from "./ChatCache";
 
 dotenv.config();
