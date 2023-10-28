@@ -1,14 +1,10 @@
 import OpenAI from "openai";
-import * as dotenv from "dotenv";
+import dotenv from 'dotenv';
 import { WeiPerEther, ethers, formatEther } from "ethers";
 import { PrimeSdk } from '@etherspot/prime-sdk';
-dotenv.config({ path: "/.env" });
 import ChatUpdate from "./ChatCache";
 
-type MintInfo = {
-  address: string;
-  amount: ethers.BigNumberish;
-};
+dotenv.config();
 
 type MessageInfo = {
   update_id: number;
@@ -108,16 +104,14 @@ async function usernameCanJoin(username: string): Promise<boolean> {
 }
 
 // Mints new tokens for the token reward
-async function mintTokens(mintInfos: MintInfo[]) {
-  for (let info of mintInfos) {
+async function mintTokens(address: string, amount: BigInt) {
     try {
-      const tx = await ChatChampionContract.mint(info.address, info.amount);
+      const tx = await ChatChampionContract.mint(address, amount);
       await tx.wait();  // Wait for the transaction to be mined
-      console.log(`Minted ${info.amount} tokens for address: ${info.address}`);
+      console.log(`Minted ${amount} tokens for address: ${address}`);
     } catch (err) {
-      console.error(`Error minting tokens for address: ${info.address}. Error: ${err.message}`);
+      console.error(`Error minting tokens for address: ${address}. Error: ${err.message}`);
     }
-  }
 }
 
 
@@ -132,10 +126,10 @@ async function mintWallet(telegramUsername: string): Promise<[string, string]> {
   //Temporarily disabled:
   //const primeSdk = new PrimeSdk({ privateKey: wallet.privateKey }, { chainId: parseInt(process.env.CHAINID), projectKey: process.env.ETHERSPOT_PROJECT_KEY  });
   //const address: string = await primeSdk.getCounterFactualAddress();
-  
   const address: string = wallet.address;
   console.log('\x1b[33m%s\x1b[0m', `EtherspotWallet address: ${address}`);
-  await mintTokens([{address, ethers.getBigInt(1000)}]);
+
+  await mintTokens(address, ethers.getBigInt(1000) * ethers.WeiPerEther);
 
   return [address, wallet.privateKey];
 }
