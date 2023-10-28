@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import * as dotenv from "dotenv";
 dotenv.config({ path: "/.env" });
 import { ethers } from "ethers";
+import ChatUpdate from "./ChatCache";
 
 type MintInfo = {
   address: string;
@@ -34,7 +35,9 @@ const openai = new OpenAI({
   apiKey: "",
   baseURL: "http://flock.tools:8001/v1", // defaults to https://api.openai.com/v1
 });
-const instruction = `can you rate the participants in this conversation based on their humor? Take 1000 points and distrbute them amongst each user based on their level of humor and map it against their name. The format is a json array of username: score  Only write the json data and not any text.`;
+const instruction = `can you rate the participants in this conversation based on their humor? Take 1000 points and distrbute them amongst each user based on their level of humor and map it against their name. The format is a json array of username: score  Only write the json data and not any text. At the end of the analysis give a json summary`;
+
+const instruction1 = `can you rate the participants in this conversation based on their humor? Take 1000 points and distrbute them amongst each user based on their level of humor and map it against their name. The format is a json array of username: score  Only write the json data and not any text.`;
 const instruction2 = `In the chatroom below, participants were rated based on the humor level of their messages. Using the provided leaderboard and messages, determine the reasoning behind each participant's score. How do their messages reflect their ranking on the leaderboard? Consider elements such as wit, puns, timing, and the context of the conversation.`;
 const tokenAbi = [
   "function mint(address to, uint256 amount) public"
@@ -107,14 +110,26 @@ async function mintTokens(providerUrl: string, privateKey: string, contractAddre
   }
 }
 
-async function main() {
-  var messages = formatMessages(getMessages());
-  console.log("Result:\n");
-  var result = await analyzeChat(instruction + messages);
-  console.log(result);
-
-  console.log("Reasoning:\n");
-  var reasoning = await analyzeChat(instruction2 + "\n\nLeaderboard:\n" + result + "\n\nChatroom messages:\n" + messages);
-  console.log(reasoning);
+async function startAnalysis(messages: string){
+    console.log("Result:\n");
+    var result = await analyzeChat(instruction + messages);
+    console.log(result);
+  
+    console.log("Reasoning:\n");
+    var reasoning = await analyzeChat(instruction2 + "\n\nLeaderboard:\n" + result + "\n\nChatroom messages:\n" + messages);
+    return reasoning;
 }
-main();
+
+// async function main() {
+//   var messages = formatMessages(getMessages());
+//   console.log("Result:\n");
+//   var result = await analyzeChat(instruction + messages);
+//   console.log(result);
+
+//   console.log("Reasoning:\n");
+//   var reasoning = await analyzeChat(instruction2 + "\n\nLeaderboard:\n" + result + "\n\nChatroom messages:\n" + messages);
+//   console.log(reasoning);
+// }
+// main();
+
+export default startAnalysis
