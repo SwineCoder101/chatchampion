@@ -38,7 +38,17 @@ app.post(URI, (req, res) => {
     console.log(req.body);
     res.status(200).send('ok');
 });
+app.get(URI, (req, res) => {
+    res.send('Hello');
+});
 app.listen(PORT, () => __awaiter(void 0, void 0, void 0, function* () {
     console.log(`Server running on port ${PORT}`);
+    console.log(`Webhook URL: ${webhookURL}`);
+    try {
+        yield setupWebhook();
+    }
+    catch (error) {
+        console.error("Webhook setup failed:", error.message);
+    }
 }));
 //# sourceMappingURL=bot.js.map
