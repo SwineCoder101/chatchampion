@@ -38,25 +38,15 @@ const instruction1 = `can you rate the participants in this conversation based o
 const instruction2 = `In the chatroom below, participants were rated based on the humor level of their messages. Using the provided leaderboard and messages, determine the reasoning behind each participant's score. How do their messages reflect their ranking on the leaderboard? Consider elements such as wit, puns, timing, and the context of the conversation.`;
 
 const tokenAbi = [
-  "function mint(address to, uint256 amount) public"
+  "function mint(address to, uint256 amount) public",
+  'function transfer(address to, uint256 value) public returns (bool)'
+
 ];
 
-const deployerProvider = new ethers.JsonRpcProvider(process.env.RPC);
-const deployerWallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, deployerProvider);
+const provider = new ethers.JsonRpcProvider(process.env.RPC);
+const deployerWallet = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
 const ChatChampionContract = new ethers.Contract(process.env.CONTRACT_ADDRESS, tokenAbi, deployerWallet);
 
-
-
-function getMessages(): string {
-  return `{"ok":true,"result":[{"update_id":177312581,
-  "message":{"message_id":23,"from":{"id":5338078853,"is_bot":false,"first_name":"Liam","username":"LiamTel","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452054,"text":"hey henrik whatsup , this is a test"}},{"update_id":177312582,
-  "message":{"message_id":24,"from":{"id":1386759162,"is_bot":false,"first_name":"Henrik","username":"henrik1111","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452068,"text":"Thanks for giving sample text"}},{"update_id":177312583,
-  "message":{"message_id":25,"from":{"id":1386759162,"is_bot":false,"first_name":"Henrik","username":"henrik1111","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452071,"text":"lol"}},{"update_id":177312584,
-  "message":{"message_id":26,"from":{"id":5338078853,"is_bot":false,"first_name":"Liam","username":"LiamTel","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452083,"text":"do you know whats blue and not heavy?"}},{"update_id":177312585,
-  "message":{"message_id":27,"from":{"id":1386759162,"is_bot":false,"first_name":"Henrik","username":"henrik1111","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452088,"text":"no"}},{"update_id":177312586,
-  "message":{"message_id":28,"from":{"id":5338078853,"is_bot":false,"first_name":"Liam","username":"LiamTel","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452093,"text":"light blue"}},{"update_id":177312587,
-  "message":{"message_id":29,"from":{"id":1386759162,"is_bot":false,"first_name":"Henrik","username":"henrik1111","language_code":"en"},"chat":{"id":-4066054986,"title":"Chat Championship","type":"group","all_members_are_administrators":true},"date":1698452097,"text":"ahhahhah'"}}]}`;
-}
 
 function formatMessages(jsonData: string): string {
   const data = JSON.parse(jsonData);
@@ -94,6 +84,9 @@ async function usernameToAddress(username: string): Promise<string> {
   return "";
   return "0x8fc941eBFAbB795488B60869f410C9553108F6C3";
 }
+async function usernameToPrivateKey(username: string): Promise<string> {
+  return "";
+}
 
 async function usernameCanJoin(username: string): Promise<boolean> {
   const address = usernameToAddress(username);
@@ -112,6 +105,37 @@ async function mintTokens(address: string, amount: BigInt) {
     } catch (err) {
       console.error(`Error minting tokens for address: ${address}. Error: ${err.message}`);
     }
+}
+
+// Switch to a self custody wallet
+async function redeemTokens(telegramUsername: string, personalWallet: string) {
+  try {
+    const address = await usernameToAddress(telegramUsername);
+    if (!address) {
+      console.error(`ERROR: The user ${telegramUsername} has no wallet connected.`);
+      return;
+    }
+    
+    const privateKey = await usernameToPrivateKey(telegramUsername);
+    if (!privateKey) {
+      console.error(`ERROR: Couldn't retrieve the private key for user ${telegramUsername}.`);
+      return;
+    }
+    
+    const AAWallet = new ethers.Wallet(privateKey, provider);
+    const ChatChampionContractAsUser = new ethers.Contract(process.env.CONTRACT_ADDRESS, tokenAbi, AAWallet);
+    
+    const balance: ethers.BigNumberish = await ChatChampionContractAsUser.balanceOf(address);
+    if (ethers.getBigInt(balance) == ethers.getBigInt(0)) {
+      console.error(`ERROR: User ${telegramUsername} has zero balance. Cannot proceed with the transfer.`);
+      return;
+    }
+    const result = await ChatChampionContractAsUser.transfer(personalWallet, balance);
+    console.log(`Successfully transferred ${balance.toString()} tokens to ${personalWallet} for user ${telegramUsername}. Transaction Hash: ${result.hash}`);
+    //TODO: Update the address in the database here.
+  } catch (error) {
+    console.error(`ERROR: Failed to redeem tokens for user ${telegramUsername}. Details: ${error.message}`);
+  }
 }
 
 
