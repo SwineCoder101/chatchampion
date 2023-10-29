@@ -287,6 +287,8 @@ type MessageInfo = {
   }
   
   async function distribute(jsonData: string) {
+
+    const recieptUrls = [];
     type UserScores = {
       [username: string]: number;
     };
@@ -297,9 +299,11 @@ type MessageInfo = {
         let score = parsedData[username];
         console.log(`Username: ${username}, Score: ${score}`);
         let address = await usernameToAddress(username);
-        ChatChampionContract.mint(address, ethers.toBigInt(score) * ethers.WeiPerEther);
+        let tx = await ChatChampionContract.mint(address, ethers.toBigInt(score) * ethers.WeiPerEther);
+        recieptUrls.push(`Transfering  ${score} tokens to ${username} https://coston2-explorer.flare.network/tx/${tx.hash}`);
       }
     }
+    return recieptUrls;
   }
 
 
@@ -308,11 +312,11 @@ type MessageInfo = {
       var result = await analyzeChat(instruction + messages);
       console.log(result);
 
-      await distribute(result);
+      const reciepts = await distribute(result);
     
       console.log("Reasoning:\n");
       var reasoning = await analyzeChat(instruction2 + "\n\nLeaderboard:\n" + result + "\n\nChatroom messages:\n" + messages);
-      return reasoning;
+      return {reasoning, reciepts};
   }
 
 
@@ -381,9 +385,9 @@ app.post(URI, async (req: Request, res: Response) => {
         if(sentMessage === '/analyze'){
             const updates = ChatCache.getUpdates(chatId);
             await sendMessage(chatId,'Analysing the chat now ...');
-            const analysis = await startAnalysis(updates);
-            console.log(analysis);
-            await sendMessage(chatId,analysis);
+            const {reasoning,reciepts} = await startAnalysis(updates);
+            console.log(reasoning);
+            await sendMessage(chatId,reasoning + "\n" + reciepts.join("\n"));
             ChatCache.resetChat(chatId);
         }
 
