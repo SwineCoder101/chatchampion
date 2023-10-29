@@ -142,10 +142,13 @@ app.post(URI, async (req: Request, res: Response) => {
         updateArray.push(req.body);
 
         ChatCache.addUpdate(chatId, req.body);
+        const regex = /^\/createWallet\s+(\S+)/;
+        const match = sentMessage.match(regex);
 
         //create a wallet
-        if (sentMessage === '/createWallet'){
-            sendMessage(chatId,'about to create wallet here');
+        if (match){
+            const username = match[1];
+            sendMessage(chatId,'about to create wallet for ' + username);
         }
 
         //analyze the chat
