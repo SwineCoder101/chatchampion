@@ -4,10 +4,8 @@ import axios from 'axios';
 import ChatCache from './ChatCache';
 import { WeiPerEther, ethers, formatEther } from "ethers";
 import OpenAI from "openai";
-
-
 import { Chat } from 'openai/resources';
-import { addToDatabase, queryDatabaseByUserName, queryDatabaseByAddress } from './WalletStore';
+import { addToDatabase, queryDatabaseByUserName, queryDatabaseByAddress, deleteRowByUsername } from './WalletStore';
 import {queryDatabaseByUserId} from './WalletStore';
 
 dotenv.config();
@@ -167,7 +165,8 @@ type MessageInfo = {
   
   const tokenAbi = [
     "function mint(address to, uint256 amount) public",
-    'function transfer(address to, uint256 value) public returns (bool)'
+    'function transfer(address to, uint256 value) public returns (bool)',
+    'function balanceOf(address owner) view returns (uint256)'
   ];
   
   const provider = new ethers.JsonRpcProvider(process.env.RPC);
@@ -217,11 +216,12 @@ type MessageInfo = {
   
   // Should get the evm address of the telegram username.
   async function usernameToAddress(username: string): Promise<string> {
-    return "";
-    return "0x8fc941eBFAbB795488B60869f410C9553108F6C3";
+    const userInfo = await queryDatabaseByUserName(username);
+    return userInfo.address;
   }
   async function usernameToPrivateKey(username: string): Promise<string> {
-    return "";
+    const userInfo = await queryDatabaseByUserName(username);
+    return userInfo.key;
   }
   
   async function usernameCanJoin(username: string): Promise<boolean> {
@@ -238,50 +238,46 @@ type MessageInfo = {
         const tx = await ChatChampionContract.mint(address, amount);
         await tx.wait();  // Wait for the transaction to be mined
         console.log(`Minted ${amount} tokens for address: ${address}`);
+        return tx;
       } catch (err) {
         console.error(`Error minting tokens for address: ${address}. Error: ${err.message}`);
       }
   }
   
   // Switch to a self custody wallet
-  async function redeemTokens(telegramUsername: string, personalWallet: string) {
+  async function redeemTokens(telegramUsername: string, personalWallet: string, privateKey: string, custodialWallet: string) {
     try {
-      const address = await usernameToAddress(telegramUsername);
-      if (!address) {
-        console.error(`ERROR: The user ${telegramUsername} has no wallet connected.`);
-        return;
-      }
-      
-      const privateKey = await usernameToPrivateKey(telegramUsername);
-      if (!privateKey) {
-        console.error(`ERROR: Couldn't retrieve the private key for user ${telegramUsername}.`);
-        return;
-      }
-      
+        console.log(`private key ${privateKey}`);
       const AAWallet = new ethers.Wallet(privateKey, provider);
       const ChatChampionContractAsUser = new ethers.Contract(process.env.CONTRACT_ADDRESS, tokenAbi, AAWallet);
+
+      await deployerWallet.sendTransaction({to: AAWallet, value: ethers.parseEther("0.05")});
+
+      const balance: ethers.BigNumberish = await ChatChampionContractAsUser.balanceOf(custodialWallet);
       
-      const balance: ethers.BigNumberish = await ChatChampionContractAsUser.balanceOf(address);
       if (ethers.getBigInt(balance) == ethers.getBigInt(0)) {
         console.error(`ERROR: User ${telegramUsername} has zero balance. Cannot proceed with the transfer.`);
         return;
       }
       const result = await ChatChampionContractAsUser.transfer(personalWallet, balance);
       console.log(`Successfully transferred ${balance.toString()} tokens to ${personalWallet} for user ${telegramUsername}. Transaction Hash: ${result.hash}`);
-      //TODO: Update the address in the database here.
+
+
+      return `https://coston2-explorer.flare.network/tx/${result.hash}`;
     } catch (error) {
       console.error(`ERROR: Failed to redeem tokens for user ${telegramUsername}. Details: ${error.message}`);
     }
+  }
+
+  async function balanceOf(address: string) {
+    const balance: ethers.BigNumberish = await ChatChampionContract.balanceOf(address);
+    return balance;
   }
   
   
   // Mints a pre-funded wallet that we use to invite people for free.
   // Returns [address, privateKey]
-  async function mintWallet(telegramUsername: string): Promise<[string, string]> {
-    if (await usernameToAddress(telegramUsername) != "") {
-      console.log("User already has an address.");
-      return null;
-    }
+  async function mintWallet(telegramUsername: string): Promise<[string, string, string]> {
     const wallet = ethers.Wallet.createRandom();
     //Temporarily disabled:
     //const primeSdk = new PrimeSdk({ privateKey: wallet.privateKey }, { chainId: parseInt(process.env.CHAINID), projectKey: process.env.ETHERSPOT_PROJECT_KEY  });
@@ -289,9 +285,13 @@ type MessageInfo = {
     const address: string = wallet.address;
     console.log('\x1b[33m%s\x1b[0m', `EtherspotWallet address: ${address}`);
   
-    await mintTokens(address, ethers.getBigInt(1000) * ethers.WeiPerEther);
+    const tx = await mintTokens(address, ethers.getBigInt(1000) * ethers.WeiPerEther);
+
+    console.log(tx);
+
+    const transactionReceiptURL = `https://coston2-explorer.flare.network/tx/${tx.hash}`;
   
-    return [address, wallet.privateKey];
+    return [address, wallet.privateKey,transactionReceiptURL];
   }
   
   async function startAnalysis(messages: string){
@@ -315,29 +315,62 @@ app.post(URI, async (req: Request, res: Response) => {
         updateArray.push(req.body);
 
         ChatCache.addUpdate(chatId, req.body);
-        const regex = /^\/createWallet\s+(\S+)/;
-        const match = sentMessage.match(regex);
+        const regexCreateWallet = /^\/createWallet\s+(\S+)/;
+        const matchForCreateWallet = sentMessage.match(regexCreateWallet);
+
+        const regexRedeem = /^\/redeem\s+(\S+)/;
+        const matchForRedeem = sentMessage.match(regexRedeem);
+
+        if (matchForRedeem){
+            const address = matchForRedeem[1];
+            let userWalletInfo = await queryDatabaseByUserId(userId+"A");
+            console.log(userWalletInfo);
+
+            if (!userWalletInfo || !userWalletInfo.address){
+                await sendMessage(chatId,'The following user does not have a wallet: ' + userWalletInfo.username);
+            }
+
+            if (!userWalletInfo || !userWalletInfo.address){
+                await sendMessage(chatId,'The following user had already redeemed' + userWalletInfo.username + ' to address: ' + userWalletInfo.address);
+            }
+
+            await sendMessage(chatId, 'about to redeem tokens for ' + userWalletInfo.username + ' to address: ' + address);
+
+            const urlReciept = await redeemTokens(userWalletInfo.username, address, userWalletInfo.key, userWalletInfo.address);
+            
+            // await deleteRowByUsername(userWalletInfo.username);
+            // await addToDatabase(userId + "A", userWalletInfo.username, '', address);
+            
+            const numberOftokens = await balanceOf(address);
+            await sendMessage(chatId,'Redeemed ' +  numberOftokens + ' tokens for username: ' + userWalletInfo.username + "\n\n reciept url:" + urlReciept);
+        }
 
         //create a wallet
-        if (match){
-            const username = match[1];
-            sendMessage(chatId,'about to create wallet for ' + username);
-        }
-        if (sentMessage === '/createWallet'){
-            sendMessage(chatId,'about to create wallet here');
-            const result = mintWallet(userId);
-            const address = result[0];
-            const privateKey = result[1];
-            // Put the info in the database here.
+        if (matchForCreateWallet){
+            const username = matchForCreateWallet[1];
+            const userWalletInfo = await queryDatabaseByUserName(username);
+            console.log(userWalletInfo);
+
+            if (userWalletInfo){
+                await sendMessage(chatId,'The following user already has a wallet: ' + username);
+            } else {
+                await sendMessage(chatId,'about to create wallet for ' + username);
+                const result = await mintWallet(userId);
+                const address = result[0];
+                const privateKey = result[1];
+                const recieptUrl = result[2];
+                await addToDatabase(userId + "A", username, privateKey, address);
+                await sendMessage(chatId,'Here is your wallet address: ' + address + "\n\n reciept url:" + recieptUrl);
+            }
         }
 
         //analyze the chat
         if(sentMessage === '/analyze'){
             const updates = ChatCache.getUpdates(chatId);
-            sendMessage(chatId,'Analysing the chat now ...');
+            await sendMessage(chatId,'Analysing the chat now ...');
             const analysis = await startAnalysis(updates);
             console.log(analysis);
-            sendMessage(chatId,analysis);
+            await sendMessage(chatId,analysis);
             ChatCache.resetChat(chatId);
         }
 

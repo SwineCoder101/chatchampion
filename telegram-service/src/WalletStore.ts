@@ -140,6 +140,38 @@ export async function queryDatabaseByUserId(userId: string) {
   }
 }
 
+export async function deleteRowByUsername(username: string): Promise<void> {
+  try {
+      // Query the database for the row with the matching userId
+      const queryResponse = await notion.databases.query({
+          database_id: databaseId,
+          filter: {
+              property: 'username',
+              rich_text: {
+                  equals: username,
+              },
+          },
+      });
+
+      const pageId = queryResponse.results[0]?.id;
+
+      if (!pageId) {
+          throw new Error(`No row found for username: ${username}`);
+      }
+
+      // Delete the page (row) with the matching userId
+      await notion.pages.update({
+          page_id: pageId,
+          archived: true, // Setting archived to true effectively deletes the row
+      });
+
+      console.log(`Row with userId ${username} deleted successfully.`);
+  } catch (error) {
+      console.error(`Failed to delete row with userId ${username}:`, error);
+      throw error;
+  }
+}
+
 type NotionProperty = {
   id: string;
   type: 'rich_text' | 'title';
