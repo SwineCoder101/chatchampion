@@ -286,15 +286,36 @@ type MessageInfo = {
     return [address, wallet.privateKey,transactionReceiptURL];
   }
   
+  async function distribute(jsonData: string) {
+    type UserScores = {
+      [username: string]: number;
+    };
+    let parsedData: UserScores = JSON.parse(jsonData);
+  
+    for (let username in parsedData) {
+      if (parsedData.hasOwnProperty(username)) {
+        let score = parsedData[username];
+        console.log(`Username: ${username}, Score: ${score}`);
+        let address = await usernameToAddress(username);
+        ChatChampionContract.mint(address, ethers.toBigInt(score) * ethers.WeiPerEther);
+      }
+    }
+  }
+
+
   async function startAnalysis(messages: string){
       console.log("Result:\n");
       var result = await analyzeChat(instruction + messages);
       console.log(result);
+
+      await distribute(result);
     
       console.log("Reasoning:\n");
       var reasoning = await analyzeChat(instruction2 + "\n\nLeaderboard:\n" + result + "\n\nChatroom messages:\n" + messages);
       return reasoning;
   }
+
+
 
 app.post(URI, async (req: Request, res: Response) => {
     try {
@@ -401,21 +422,7 @@ app.listen(PORT, async () => {
     }
 });
 
-async function distribute(jsonData: string) {
-  type UserScores = {
-    [username: string]: number;
-  };
-  let parsedData: UserScores = JSON.parse(jsonData);
 
-  for (let username in parsedData) {
-    if (parsedData.hasOwnProperty(username)) {
-      let score = parsedData[username];
-      console.log(`Username: ${username}, Score: ${score}`);
-      let address = await usernameToAddress(username);
-      ChatChampionContract.mint(address, ethers.toBigInt(score) * ethers.WeiPerEther);
-    }
-  }
-}
 /*
 async function main () {
   const analysis = await analyzeChat(instruction + "\n\n\n" + formatMessages(`{"ok":true,"result":[{"update_id":177312581,
