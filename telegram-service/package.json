@@ -1,12 +1,16 @@
 {
   "name": "telegram-service",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "bot.js",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "start": "tsc && node ./dist/bot.js",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon ./src/bot.ts"
+    "dev": "nodemon ./src/bot.ts",
+    "prod": "node ./dist/bot.js"
   },
   "keywords": [],
   "author": "",
