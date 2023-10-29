@@ -14,3 +14,4 @@ node_modules
 .env
 telegram-service/.env
 ./telegram-service/.env
+.vercel
