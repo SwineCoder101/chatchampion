@@ -4,6 +4,8 @@ import axios from 'axios';
 import ChatCache from './ChatCache';
 import startAnalysis from './flock-main';
 import { Chat } from 'openai/resources';
+import { addToDatabase, queryDatabaseByUserName, queryDatabaseByAddress } from './WalletStore';
+import {queryDatabaseByUserId} from './WalletStore';
 
 dotenv.config();
 
