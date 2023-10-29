@@ -10,7 +10,7 @@ import {queryDatabaseByUserId} from './WalletStore';
 
 dotenv.config();
 
-const { PORT, TELEGRAM_TOKEN, SERVER_URL } = process.env;
+const { PORT, TELEGRAM_TOKEN, SERVER_URL, MAINET_EXPLORER_URL } = process.env;
 
 
 const app = express();
@@ -255,7 +255,7 @@ type MessageInfo = {
       console.log(`Successfully transferred ${balance.toString()} tokens to ${personalWallet} for user ${telegramUsername}. Transaction Hash: ${result.hash}`);
 
 
-      return `https://coston2-explorer.flare.network/tx/${result.hash}`;
+      return `${MAINET_EXPLORER_URL}${result.hash}`;
     } catch (error) {
       console.error(`ERROR: Failed to redeem tokens for user ${telegramUsername}. Details: ${error.message}`);
     }
@@ -281,7 +281,7 @@ type MessageInfo = {
 
     console.log(tx);
 
-    const transactionReceiptURL = `https://coston2-explorer.flare.network/tx/${tx.hash}`;
+    const transactionReceiptURL = `${MAINET_EXPLORER_URL}${tx.hash}`;
   
     return [address, wallet.privateKey,transactionReceiptURL];
   }
@@ -397,6 +397,26 @@ app.post(URI, async (req: Request, res: Response) => {
             console.log("=========UPDATES==========")
             console.log(updates);
             console.log("=========UPDATES==========")
+        }
+
+        if(sentMessage === '/start'){
+            const welcomeMsg = `Welcome Chat Champion! 🌟🚀🎉
+
+            Welcome to Chat Champions, an engaging Telegram community where you can earn tokens by chatting, engaging with communities, and sharing your humor through jokes. Join us, climb the leaderboard for rewards, participate in fun challenges, and reach out to our Chatbot Champions for assistance. Don't forget to create your wallet by messaging our admins to enhance your Chat Champions experience! 🌟💬🚀🎉
+            
+            Why be a Chat Champion?
+            - Earn tokens by chatting and engaging with communities. 💬💰
+            - Share humor and make jokes to add positivity. 😂😁
+            - Climb the leaderboard for exciting rewards. 🏆🎁
+            - Participate in regular challenges and special events. 🌈🎉
+            - Chatbot Champions are ready to assist you. 🤖💼
+            - Create your wallet for an enhanced experience. 💼✨
+            - To redeem your tokens, type /redeem <address>💰
+            
+            Join now and DM our admins to get EXCLUSIVE ACCESS and WIN CHAMP Tokens!💬🏆`;
+
+            await sendMessage(chatId,welcomeMsg);
+
         }
 
         // Send the response after the asynchronous operation is complete
