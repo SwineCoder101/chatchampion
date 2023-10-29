@@ -7,6 +7,26 @@ import OpenAI from "openai";
 import { Chat } from 'openai/resources';
 import { addToDatabase, queryDatabaseByUserName, queryDatabaseByAddress, deleteRowByUsername } from './WalletStore';
 import {queryDatabaseByUserId} from './WalletStore';
+import TelegramBot from 'node-telegram-bot-api';
+
+const BOT_TOKEN = process.env.TELEGRAM_TOKEN; // Replace with your token from BotFather
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+
+  if (msg.new_chat_members && msg.new_chat_members.length > 0) {
+    for (const member of msg.new_chat_members) {
+      const canJoin = await usernameCanJoin(member.userName);
+
+      if (!canJoin) {
+        // If user cannot join, kick them out
+        await bot.kickChatMember(chatId, member.id.toString());
+        bot.sendMessage(chatId, `Sorry ${member.first_name}, you are not allowed to join this group.`);
+      }
+    }
+  }
+});
 
 dotenv.config();
 
@@ -215,6 +235,9 @@ type MessageInfo = {
     const userInfo = await queryDatabaseByUserName(username);
     return userInfo.key;
   }
+
+
+
   
   async function usernameCanJoin(username: string): Promise<boolean> {
     const address = usernameToAddress(username);
